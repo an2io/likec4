@@ -1,0 +1,85 @@
+# syntax=docker/dockerfile:1
+# Build the LikeC4 CLI from THIS repository's source (audited fork) — NOT from npm.
+# Unlike ./Dockerfile (which runs `npm install -g likec4@latest`), this produces a
+# self-contained image where likec4 + @likec4/core + @likec4/icons all come from
+# your tree. Mirrors the repo's own e2e pack flow (`pretest:e2e`).
+#
+# Note: the LikeC4 *source* is built from your audited tree. Its npm dependencies
+# (vite, esbuild, @hpcc-js/wasm-graphviz, ...) resolve within the ranges declared
+# in the packed package.json — same as the official image / any `npm i likec4`.
+
+############################  Stage 1 — build & pack from source  ############################
+FROM node:22.22.3-bookworm AS builder
+
+# NODE_ENV=production matches the repo's `pretest:e2e` pack invocation.
+# It also makes Husky's `prepare` hook self-skip (no .git in the build context).
+ENV NODE_ENV=production
+RUN corepack enable
+
+WORKDIR /src
+COPY . .
+
+# Install against the audited, integrity-pinned lockfile.
+RUN pnpm install --frozen-lockfile
+
+# turbo graph: pack -> build -> generate. Same filters as `pretest:e2e`.
+# Produces packages/{core,icons,likec4}/package.tgz, all built from this tree.
+RUN pnpm turbo run pack \
+      --filter=@likec4/core \
+      --filter=@likec4/icons \
+      --filter=likec4
+
+############################  Stage 2 — minimal runtime  ############################
+FROM node:22.22.3-bookworm-slim AS runtime
+
+ENV NODE_ENV=production \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    # Keep the image lean: skip Playwright's browser download. PNG/JPG export
+    # needs `npx playwright install chromium` at runtime (or use ./Dockerfile).
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+# Native Graphviz: inside a container likec4 defaults to `--use-dot` (bundled
+# WASM has memory issues on large models). Debian's graphviz is older but fine;
+# for the newest, port the from-source Graphviz stage from ./Dockerfile.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends graphviz fonts-dejavu ca-certificates \
+ && dot -V \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/likec4
+
+# Locally-built tarballs from the builder stage.
+COPY --from=builder /src/packages/core/package.tgz   ./core.tgz
+COPY --from=builder /src/packages/icons/package.tgz  ./icons.tgz
+COPY --from=builder /src/packages/likec4/package.tgz ./likec4.tgz
+
+# `overrides` pins @likec4/* to the local tarballs so NOTHING is fetched from npm
+# for the LikeC4 packages themselves (react/react-dom still come from npm).
+COPY <<'EOF' /opt/likec4/package.json
+{
+  "name": "likec4-runtime",
+  "private": true,
+  "dependencies": {
+    "@likec4/core": "file:./core.tgz",
+    "@likec4/icons": "file:./icons.tgz",
+    "likec4": "file:./likec4.tgz",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "overrides": {
+    "@likec4/core": "file:./core.tgz",
+    "@likec4/icons": "file:./icons.tgz"
+  }
+}
+EOF
+
+RUN npm install --omit=dev --no-audit --no-fund \
+ && ln -sf /opt/likec4/node_modules/.bin/likec4 /usr/local/bin/likec4 \
+ && likec4 --help > /dev/null \
+ && echo "likec4 CLI OK"
+
+WORKDIR /data
+EXPOSE 5173 24678
+ENTRYPOINT ["likec4"]
+CMD ["--help"]

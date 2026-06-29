@@ -1,0 +1,14 @@
+# Keep the build context small. NOTE: do not ignore any package.json or the
+# lockfile/workspace files — `pnpm install --frozen-lockfile` needs all of them.
+**/node_modules
+.git
+**/.turbo
+**/dist
+**/lib
+**/*.tsbuildinfo
+**/package.tgz
+audit
+.claude
+.devcontainer
+e2e/test-results
+e2e/playwright-report
