@@ -1,0 +1,15 @@
+{
+  "name": "likec4-runtime",
+  "private": true,
+  "dependencies": {
+    "@likec4/core": "file:./core.tgz",
+    "@likec4/icons": "file:./icons.tgz",
+    "likec4": "file:./likec4.tgz",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "overrides": {
+    "@likec4/core": "file:./core.tgz",
+    "@likec4/icons": "file:./icons.tgz"
+  }
+}

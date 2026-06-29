@@ -56,23 +56,8 @@ COPY --from=builder /src/packages/likec4/package.tgz ./likec4.tgz
 
 # `overrides` pins @likec4/* to the local tarballs so NOTHING is fetched from npm
 # for the LikeC4 packages themselves (react/react-dom still come from npm).
-COPY <<'EOF' /opt/likec4/package.json
-{
-  "name": "likec4-runtime",
-  "private": true,
-  "dependencies": {
-    "@likec4/core": "file:./core.tgz",
-    "@likec4/icons": "file:./icons.tgz",
-    "likec4": "file:./likec4.tgz",
-    "react": "^19",
-    "react-dom": "^19"
-  },
-  "overrides": {
-    "@likec4/core": "file:./core.tgz",
-    "@likec4/icons": "file:./icons.tgz"
-  }
-}
-EOF
+# Plain COPY (not a BuildKit heredoc) so this builds with the classic builder too.
+COPY docker/runtime-package.json /opt/likec4/package.json
 
 RUN npm install --omit=dev --no-audit --no-fund \
  && ln -sf /opt/likec4/node_modules/.bin/likec4 /usr/local/bin/likec4 \
