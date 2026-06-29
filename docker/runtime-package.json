@@ -10,6 +10,7 @@
   },
   "overrides": {
     "@likec4/core": "file:./core.tgz",
-    "@likec4/icons": "file:./icons.tgz"
+    "@likec4/icons": "file:./icons.tgz",
+    "vite": "8.0.14"
   }
 }

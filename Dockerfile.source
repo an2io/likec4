@@ -56,6 +56,9 @@ COPY --from=builder /src/packages/likec4/package.tgz ./likec4.tgz
 
 # `overrides` pins @likec4/* to the local tarballs so NOTHING is fetched from npm
 # for the LikeC4 packages themselves (react/react-dom still come from npm).
+# It also pins vite to 8.0.14 (the version in the audited lockfile): likec4 declares
+# vite "^8.0.14", and npm would otherwise pull 8.1.x, whose import-analysis breaks the
+# dev server (it rewrites graphology's `import()` method into a dynamic import -> blank page).
 # Plain COPY (not a BuildKit heredoc) so this builds with the classic builder too.
 COPY docker/runtime-package.json /opt/likec4/package.json
 
